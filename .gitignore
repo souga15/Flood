@@ -1,0 +1,28 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Node
+node_modules/
+dist/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large data files (not needed at runtime)
+*.csv
+models/new_model/evaluation_plots.png
+models/new_model/shap_*.png
+models/real_data_analysis.png
+models/v_new/
+HEM_HMS/
+HEM_RAS/
+Report/
+Workflow_py/
+colab_files/

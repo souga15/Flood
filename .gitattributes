@@ -1,0 +1,13 @@
+# Mark pickle files as binary so Git doesn't mess up line endings
+*.pkl binary
+*.pickle binary
+*.joblib binary
+*.h5 binary
+*.model binary
+
+# Other binary formats
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
