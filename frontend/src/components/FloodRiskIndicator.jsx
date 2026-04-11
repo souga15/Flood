@@ -1,5 +1,6 @@
 /**
- * FloodRiskIndicator - Enhanced with granular risk bands for Model V2
+ * FloodRiskIndicator - 4-tier risk display for Model V4
+ * Tiers: low (<20%) | moderate (20-40%) | high (40-65%) | very_high (≥65%)
  */
 export default function FloodRiskIndicator({ prediction, riskLevel, confidence }) {
     if (!prediction) {
@@ -12,52 +13,58 @@ export default function FloodRiskIndicator({ prediction, riskLevel, confidence }
         );
     }
 
-    // Calculate detailed risk band from probability
-    const getRiskBand = (probability) => {
-        if (probability < 20) return 'low';
-        if (probability < 50) return 'moderate';
-        if (probability < 75) return 'high';
-        return 'severe';
+    // Derive tier from confidence, matching the V4 backend thresholds
+    const getTier = (prob) => {
+        if (prob < 20) return 'low';
+        if (prob < 40) return 'moderate';
+        if (prob < 65) return 'high';
+        return 'very_high';
     };
 
-    const getRiskDescription = (band) => {
-        const descriptions = {
-            low: 'Status: Minimal flood risk. Conditions are currently stable.',
-            moderate: 'Caution: Moderate flood risk. Monitor weather conditions.',
-            high: 'Warning: High probability of flooding. Prepare for possible evacuation.',
-            severe: 'Alert: Severe flood risk! Immediate action recommended.'
-        };
-        return descriptions[band] || descriptions.low;
+    const tierConfig = {
+        low: {
+            label: 'Low Risk',
+            description: 'Status: Minimal flood risk. Conditions are currently stable.',
+        },
+        moderate: {
+            label: 'Moderate Risk',
+            description: 'Caution: Moderate flood risk detected. Monitor weather conditions closely.',
+        },
+        high: {
+            label: 'High Risk',
+            description: 'Warning: High probability of flooding. Prepare for possible evacuation.',
+        },
+        very_high: {
+            label: 'Very High Risk',
+            description: 'Alert: Very high flood risk! Take immediate precautionary action.',
+        },
     };
 
-    const getRiskLabel = (band) => {
-        const labels = {
-            low: 'Low Risk',
-            moderate: 'Moderate Risk',
-            high: 'High Risk',
-            severe: 'Severe Risk'
-        };
-        return labels[band] || labels.low;
-    };
+    // Use backend's risk_level if available, otherwise derive from confidence
+    const tier = riskLevel || getTier(confidence);
+    const config = tierConfig[tier] || tierConfig.low;
 
-    const detailedRiskBand = getRiskBand(confidence);
+    // Scale bar tick positions matching new thresholds (0, 20, 40, 65, 100)
+    const tickLabels = ['0%', '20%', '40%', '65%', '100%'];
 
     return (
-        <div className={`flood-risk-indicator ${detailedRiskBand}`}>
+        <div className={`flood-risk-indicator ${tier}`}>
             <div className="risk-header">
                 <h2>Risk Assessment</h2>
             </div>
 
             <div className="risk-content">
                 <div className="risk-text">
-                    <h3 className="prediction-text">{prediction}</h3>
+                    <h3 className="prediction-text">
+                        {prediction}
+                    </h3>
                     <div className="risk-badge">
-                        <span className={`badge ${detailedRiskBand}`}>
-                            {getRiskLabel(detailedRiskBand)}
+                        <span className={`badge ${tier}`}>
+                            {config.label}
                         </span>
                     </div>
                     <p className="risk-description">
-                        {getRiskDescription(detailedRiskBand)}
+                        {config.description}
                     </p>
                 </div>
             </div>
@@ -75,11 +82,9 @@ export default function FloodRiskIndicator({ prediction, riskLevel, confidence }
                         />
                     </div>
                     <div className="scale-labels">
-                        <span className="low">0%</span>
-                        <span className="moderate">20%</span>
-                        <span className="high">50%</span>
-                        <span className="severe">75%</span>
-                        <span className="max">100%</span>
+                        {tickLabels.map((t) => (
+                            <span key={t}>{t}</span>
+                        ))}
                     </div>
                 </div>
             </div>
