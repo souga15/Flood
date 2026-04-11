@@ -14,16 +14,17 @@ app = Flask(__name__)
 frontend_url = os.getenv("FRONTEND_URL", "*")
 CORS(app, origins=[frontend_url, "http://localhost:3000", "http://localhost:5173"])
 
-print("--- Starting Flood Risk Prediction API ---")
+print("--- Starting Flood Risk Prediction API (V4) ---")
 
-# Initialize Logic
+# Initialize predictor
 try:
     predictor = get_predictor()
 except Exception as e:
     print(f"CRITICAL: Failed to load ML models. {e}")
     sys.exit(1)
 
-@app.route('/', methods=['GET'])
+
+@app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "service": "Flood Risk Prediction API",
@@ -32,58 +33,63 @@ def home():
         "endpoints": {
             "/health": "GET - Health check",
             "/predict": "POST - Predict flood risk (JSON: {\"city\": \"Patna\"})",
-            "/cities": "GET - List available cities"
-        }
+            "/cities": "GET - List available cities",
+        },
     })
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "healthy", "service": "flood-risk-api"})
 
-@app.route('/predict', methods=['POST'])
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy", "service": "flood-risk-api", "model_version": predictor.model_version})
+
+
+@app.route("/predict", methods=["POST"])
 def predict():
     try:
         data = request.json
-        if not data or 'city' not in data:
+        if not data or "city" not in data:
             return jsonify({"error": "City is required"}), 400
-            
-        city = data['city']
+
+        city = data["city"]
         print(f"Request received for: {city}")
-        
-        # 1. Fetch Real-time Weather
+
+        # 1. Fetch real-time weather
         weather_data = get_weather_for_city(city)
         print("Weather data fetched successfully")
-        
-        # 2. Run Prediction
+
+        # 2. Run prediction
         prediction = predictor.predict(city, weather_data)
-        
-        # 3. Construct Response
+
+        # 3. Build response
         response = {
             "city": city,
-            "latitude": weather_data['latitude'],
-            "longitude": weather_data['longitude'],
-            "temperature": weather_data['temperature'],
-            "rainfall": weather_data['rainfall'],
-            "windspeed": weather_data['windspeed'],
-            "humidity": weather_data['humidity'],
-            "prediction": prediction['prediction'],
-            "risk_level": prediction['risk_level'],
-            "confidence": prediction['confidence'],
-            "model_version": prediction.get('model_version', 'unknown'),
-            "feature_count": prediction.get('feature_count', 0)
+            "latitude": weather_data["latitude"],
+            "longitude": weather_data["longitude"],
+            "temperature": weather_data["temperature"],
+            "rainfall": weather_data["rainfall"],
+            "windspeed": weather_data["windspeed"],
+            "humidity": weather_data["humidity"],
+            # Prediction fields
+            "prediction": prediction["prediction"],
+            "risk_level": prediction["risk_level"],
+            "risk_tier": prediction.get("risk_tier", 1),
+            "confidence": prediction["confidence"],
+            "model_version": prediction.get("model_version", "unknown"),
+            "feature_count": prediction.get("feature_count", 0),
         }
 
-        # Add feature explanations
-        if 'feature_explanations' in prediction:
-            response['feature_explanations'] = prediction['feature_explanations']
-        
-        if 'feature_count' in prediction:
-            response['feature_count'] = prediction['feature_count']
-        
-        # Add model details if available (V1 includes this)
-        if 'details' in prediction:
-            response['model_details'] = prediction['details']
-        
+        # Feature explanations
+        if "feature_explanations" in prediction:
+            response["feature_explanations"] = prediction["feature_explanations"]
+
+        # Model performance metrics (V4 only)
+        if "model_metrics" in prediction:
+            response["model_metrics"] = prediction["model_metrics"]
+
+        # Legacy V1 detail fields
+        if "details" in prediction:
+            response["model_details"] = prediction["details"]
+
         return jsonify(response)
 
     except Exception as e:
@@ -91,11 +97,13 @@ def predict():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-@app.route('/cities', methods=['GET'])
+
+@app.route("/cities", methods=["GET"])
 def cities():
     from weather_fetcher import CITY_COORDINATES
     return jsonify({"cities": list(CITY_COORDINATES.keys())})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=True)
