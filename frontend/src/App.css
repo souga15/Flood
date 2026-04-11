@@ -264,19 +264,25 @@ iframe {
     flex: 1;
 }
 
-.flood-risk-indicator.severe {
-    background: linear-gradient(135deg, #7c2d12, #991b1b);
-    box-shadow: 0 4px 16px rgba(153, 27, 27, 0.3);
+.flood-risk-indicator.very_high {
+    background: linear-gradient(135deg, #450a0a, #7c2d12);
+    box-shadow: 0 4px 20px rgba(124, 45, 18, 0.45);
+    animation: pulseVeryHigh 1.8s ease-in-out infinite;
+}
+
+@keyframes pulseVeryHigh {
+    0%, 100% { box-shadow: 0 4px 20px rgba(124, 45, 18, 0.45); }
+    50%       { box-shadow: 0 6px 32px rgba(124, 45, 18, 0.7);  }
 }
 
 .flood-risk-indicator.high {
     background: linear-gradient(135deg, #ef4444, #dc2626);
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .flood-risk-indicator.moderate {
     background: linear-gradient(135deg, #f59e0b, #d97706);
-    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
 }
 
 .flood-risk-indicator.low {
@@ -384,8 +390,15 @@ iframe {
 .scale-labels {
     display: flex;
     justify-content: space-between;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     opacity: 0.8;
+    margin-top: 4px;
+}
+
+/* Risk icon in prediction heading */
+.risk-icon {
+    display: inline-block;
+    margin-right: 4px;
 }
 
 /* Error Message */
@@ -419,16 +432,18 @@ iframe {
     }
 }
 
-.alert-notification.alert-severe {
-    background: linear-gradient(135deg, #7c2d12, #991b1b);
+.alert-notification.alert-very_high {
+    background: linear-gradient(135deg, #450a0a, #7c2d12);
     color: white;
-    border: 3px solid #dc2626;
+    border: 3px solid #991b1b;
+    animation: alertPulse 1.4s ease-in-out infinite;
 }
 
 .alert-notification.alert-high {
     background: linear-gradient(135deg, #dc2626, #b91c1c);
     color: white;
     border: 3px solid #ef4444;
+    animation: alertPulse 2s ease-in-out infinite;
 }
 
 .alert-notification.alert-moderate {
@@ -583,4 +598,89 @@ iframe {
     border-top: 1px solid #e5e7eb;
     text-align: center;
     color: #9ca3af;
+}
+
+/* ── Model Metrics Panel ──────────────────────────────────────────── */
+.metrics-panel {
+    margin-bottom: 24px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+}
+
+.metrics-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #f9fafb;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+    transition: background 0.15s;
+}
+
+.metrics-toggle:hover {
+    background: #f3f4f6;
+}
+
+.metrics-chevron {
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+.metrics-body {
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.metrics-subtitle {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 700px) {
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.metric-chip {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.15s;
+}
+
+.metric-chip:hover {
+    transform: translateY(-2px);
+}
+
+.chip-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.chip-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e40af;
 }
