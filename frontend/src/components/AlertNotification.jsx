@@ -1,45 +1,58 @@
 /**
- * AlertNotification - Color-coded alert banner for flood risk warnings
+ * AlertNotification - 4-tier alert banner for Model V4
+ * Thresholds match backend classify_risk(): 20 / 40 / 65
  */
 import { useState, useEffect } from 'react';
 
 export default function AlertNotification({ confidence, riskLevel, prediction }) {
     const [dismissed, setDismissed] = useState(false);
 
-    // Reset dismissed state when prediction changes
+    // Reset dismissed when prediction refreshes
     useEffect(() => {
         setDismissed(false);
     }, [confidence, prediction]);
 
-    // Determine alert level based on probability
-    const getAlertLevel = (prob) => {
-        if (prob >= 75) return { level: 'severe', label: 'SEVERE ALERT', color: '#991b1b' };
-        if (prob >= 50) return { level: 'high', label: 'HIGH WARNING', color: '#dc2626' };
-        if (prob >= 20) return { level: 'moderate', label: 'ADVISORY', color: '#d97706' };
-        return null; // No alert for < 20%
-    };
+    const getAlertConfig = (prob, level) => {
+        // Use backend risk_level if provided, else derive from probability
+        const tier = level || (() => {
+            if (prob >= 65) return 'very_high';
+            if (prob >= 40) return 'high';
+            if (prob >= 20) return 'moderate';
+            return null;
+        })();
 
-    const getPrecautionMessage = (level) => {
-        const messages = {
-            severe: '🚨 Immediate evacuation recommended. Seek higher ground immediately. Follow official emergency instructions.',
-            high: '⚠️ Prepare for possible evacuation. Move valuables to higher floors. Monitor official alerts closely.',
-            moderate: '⚡ Monitor weather conditions. Stay informed about flood warnings. Prepare emergency supplies.'
+        const configs = {
+            very_high: {
+                level: 'very_high',
+                label: 'CRITICAL ALERT',
+                message: 'Immediate precautionary action required. Seek higher ground and follow emergency instructions from local authorities.',
+            },
+            high: {
+                level: 'high',
+                label: 'HIGH WARNING',
+                message: 'Prepare for possible evacuation. Move valuables to higher floors and monitor official alerts closely.',
+            },
+            moderate: {
+                level: 'moderate',
+                label: 'ADVISORY',
+                message: 'Monitor weather conditions. Stay informed about flood warnings in your area and prepare an emergency kit.',
+            },
         };
-        return messages[level] || '';
+
+        return configs[tier] || null;
     };
 
-    const alertInfo = getAlertLevel(confidence);
+    const alertConfig = getAlertConfig(confidence, riskLevel);
 
-    // Don't show if dismissed or no alert needed
-    if (dismissed || !alertInfo || !confidence) {
+    if (dismissed || !alertConfig || !confidence) {
         return null;
     }
 
     return (
-        <div className={`alert-notification alert-${alertInfo.level}`}>
+        <div className={`alert-notification alert-${alertConfig.level}`}>
             <div className="alert-content">
                 <div className="alert-header">
-                    <span className="alert-badge">{alertInfo.label}</span>
+                    <span className="alert-badge">{alertConfig.label}</span>
                     <span className="alert-probability">Flood Probability: {confidence}%</span>
                     <button
                         className="alert-dismiss"
@@ -51,7 +64,7 @@ export default function AlertNotification({ confidence, riskLevel, prediction })
                 </div>
                 <div className="alert-message">
                     <strong>{prediction}</strong>
-                    <p>{getPrecautionMessage(alertInfo.level)}</p>
+                    <p>{alertConfig.message}</p>
                 </div>
             </div>
         </div>
