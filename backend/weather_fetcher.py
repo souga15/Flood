@@ -170,6 +170,44 @@ def extract_weather_features(api_response: Dict) -> Dict[str, float]:
         "daily_humidity_history": daily_humidity_history,
     }
 
+def fetch_nasa_smap_data(latitude: float, longitude: float) -> list:
+    """
+    Fetch the last 10 days of GWETROOT from NASA POWER.
+    Returns a list of the most recent valid measurements.
+    """
+    import datetime
+    end = datetime.datetime.now()
+    start = end - datetime.timedelta(days=12)
+    url = "https://power.larc.nasa.gov/api/temporal/daily/point"
+    
+    params = {
+        "parameters": "GWETROOT",
+        "community": "AG",
+        "longitude": longitude,
+        "latitude": latitude,
+        "start": start.strftime("%Y%m%d"),
+        "end": end.strftime("%Y%m%d"),
+        "format": "JSON"
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        gwetroot = data.get('properties', {}).get('parameter', {}).get('GWETROOT', {})
+        # Sort by date
+        sorted_dates = sorted(gwetroot.keys())
+        valid_vals = []
+        for d in sorted_dates:
+            val = gwetroot[d]
+            if val != -999.0:  # NASA's missing value code
+                valid_vals.append(val)
+        # return the 7 most recent valid values
+        return valid_vals[-7:] if valid_vals else []
+    except Exception as e:
+        print(f"Warning: Failed to fetch SMAP data: {e}")
+        return []
+
 def get_weather_for_city(city_name: str) -> Dict[str, float]:
     """
     Get expanded weather data for a specific city
@@ -177,6 +215,11 @@ def get_weather_for_city(city_name: str) -> Dict[str, float]:
     lat, lon = get_city_coordinates(city_name)
     weather_data = fetch_weather_data(lat, lon)
     result = extract_weather_features(weather_data)
+    
+    # Fetch real NASA SMAP data
+    smap_history = fetch_nasa_smap_data(lat, lon)
+    result['smap_history'] = smap_history
+    
     result['latitude'] = lat
     result['longitude'] = lon
     return result
