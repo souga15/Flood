@@ -1,9 +1,19 @@
 """
-Feature Engineering for ML Model V3 (All-India)
-Constructs 49 features including temporal encodings, rolling statistics,
-hydrology indicators (CN, TWI), and advanced interaction terms.
+Feature Engineering for ML Model V4 (All-India, 52 features)
+Constructs 52 features: temporal encodings, rolling statistics,
+SMAP soil-moisture proxies, hydrology indicators (CN, TWI), and
+advanced interaction terms.
 
-Feature order matches: models/new_model/feature_columns_all_india.txt
+Feature order matches the V4 XGBoost scaler (52 inputs):
+  1-11:  Temporal
+  12-14: Weather basics
+  15-20: Rainfall aggregates
+  21-29: Rolling statistics
+  30-31: Hydrology proxies
+  32-34: SMAP soil-moisture proxies  ← NEW (3 features)
+  35-37: Geographic
+  38-44: CN & TWI
+  45-52: Interaction features
 """
 import numpy as np
 from datetime import datetime
@@ -34,10 +44,10 @@ CITY_ELEVATION = {
     # Others
     'Delhi': 216, 'Haridwar': 314, 'Srinagar': 1585, 'Shimla': 2276,
     'Jaipur': 431, 'Bhopal': 527, 'Indore': 550, 'Ahmedabad': 53,
+    'Guntur': 30, 'Cuttack': 27,
 }
 
-# ── SCS Curve Number (CN) for each city ──────────────────────────────
-# Higher CN → more runoff.  Urban + alluvial-plain cities have high CN.
+# ── SCS Curve Number (CN) ──────────────────────────────────────────────
 CITY_CURVE_NUMBER = {
     'Guwahati': 78, 'Dhubri': 82, 'Jorhat': 75, 'Dibrugarh': 74,
     'Patna': 85, 'Muzaffarpur': 83, 'Darbhanga': 84, 'Sitamarhi': 82,
@@ -51,10 +61,10 @@ CITY_CURVE_NUMBER = {
     'Bhubaneswar': 79, 'Rourkela': 72, 'Puri': 82,
     'Delhi': 88, 'Haridwar': 70, 'Srinagar': 65, 'Shimla': 60,
     'Jaipur': 75, 'Bhopal': 74, 'Indore': 73, 'Ahmedabad': 82,
+    'Guntur': 82, 'Cuttack': 83,
 }
 
 # ── Topographic Wetness Index (TWI) ──────────────────────────────────
-# Higher TWI → flatter / more prone to water accumulation.
 CITY_TWI = {
     'Guwahati': 11.5, 'Dhubri': 14.0, 'Jorhat': 10.0, 'Dibrugarh': 10.5,
     'Patna': 14.5, 'Muzaffarpur': 14.0, 'Darbhanga': 15.0, 'Sitamarhi': 14.0,
@@ -68,6 +78,7 @@ CITY_TWI = {
     'Bhubaneswar': 11.5, 'Rourkela': 8.5, 'Puri': 15.0,
     'Delhi': 10.0, 'Haridwar': 8.0, 'Srinagar': 7.0, 'Shimla': 5.5,
     'Jaipur': 9.0, 'Bhopal': 9.0, 'Indore': 8.5, 'Ahmedabad': 12.0,
+    'Guntur': 12.5, 'Cuttack': 13.0,
 }
 
 
@@ -83,9 +94,9 @@ def _temporal_features(date=None):
     woy   = date.isocalendar()[1]
 
     return {
-        'Month':            month,
-        'Day_of_Year':      doy,
-        'Week_of_Year':     woy,
+        'Month':             month,
+        'Day_of_Year':       doy,
+        'Week_of_Year':      woy,
         'Is_Monsoon_Season': 1 if month in (6, 7, 8, 9) else 0,
         'Is_Peak_Monsoon':   1 if month in (7, 8) else 0,
         'Is_Pre_Monsoon':    1 if month in (4, 5) else 0,
@@ -102,10 +113,9 @@ def _rolling_rain_stats(history_7, history_30):
     h7  = np.array(history_7)  if history_7  else np.zeros(1)
     h30 = np.array(history_30) if history_30 else np.zeros(1)
 
-    heavy_7   = int(np.sum(h7 > 50))      # >50 mm
-    extreme_7 = int(np.sum(h7 > 100))     # >100 mm
+    heavy_7   = int(np.sum(h7 > 50))
+    extreme_7 = int(np.sum(h7 > 100))
 
-    # Consecutive dry days (< 1 mm) from most-recent backwards in 30-day window
     dry_streak = 0
     for val in reversed(h30):
         if val < 1.0:
@@ -114,11 +124,11 @@ def _rolling_rain_stats(history_7, history_30):
             break
 
     return {
-        'Rainfall_7Day_Avg':   float(np.mean(h7)),
-        'Rainfall_7Day_Max':   float(np.max(h7)),
-        'Rainfall_7Day_Std':   float(np.std(h7)),
-        'Rainfall_30Day_Std':  float(np.std(h30)),
-        'Heavy_Rain_Days_7D':  heavy_7,
+        'Rainfall_7Day_Avg':    float(np.mean(h7)),
+        'Rainfall_7Day_Max':    float(np.max(h7)),
+        'Rainfall_7Day_Std':    float(np.std(h7)),
+        'Rainfall_30Day_Std':   float(np.std(h30)),
+        'Heavy_Rain_Days_7D':   heavy_7,
         'Extreme_Rain_Days_7D': extreme_7,
         'Consecutive_Dry_Days': dry_streak,
     }
@@ -128,9 +138,9 @@ def _cn_runoff(cn, daily_rain_mm):
     """SCS-CN method: compute direct runoff Q (mm)."""
     if cn <= 0 or cn >= 100:
         return 0.0
-    S = (25400.0 / cn) - 254.0       # potential max retention
-    Ia = 0.2 * S                      # initial abstraction
-    P = daily_rain_mm
+    S  = (25400.0 / cn) - 254.0
+    Ia = 0.2 * S
+    P  = daily_rain_mm
     if P <= Ia:
         return 0.0
     Q = ((P - Ia) ** 2) / (P - Ia + S)
@@ -138,20 +148,20 @@ def _cn_runoff(cn, daily_rain_mm):
 
 
 def _cn_category(cn):
-    """Map CN to ordinal category: 0=low, 1=med-low, 2=med, 3=med-high, 4=high."""
-    if cn < 60:  return 0
-    if cn < 70:  return 1
-    if cn < 80:  return 2
-    if cn < 90:  return 3
+    """Map CN to ordinal category: 0=low … 4=high."""
+    if cn < 60: return 0
+    if cn < 70: return 1
+    if cn < 80: return 2
+    if cn < 90: return 3
     return 4
 
 
 def _twi_risk(twi):
     """Map TWI to risk score 0-4."""
-    if twi < 7:   return 0
-    if twi < 10:  return 1
-    if twi < 12:  return 2
-    if twi < 14:  return 3
+    if twi < 7:  return 0
+    if twi < 10: return 1
+    if twi < 12: return 2
+    if twi < 14: return 3
     return 4
 
 
@@ -159,7 +169,13 @@ def _twi_risk(twi):
 
 def build_feature_vector_v3(city, weather_data, current_date=None):
     """
-    Build a 49-feature vector matching feature_columns_all_india.txt.
+    Build a 52-feature vector matching the V4 XGBoost model.
+
+    The 3 SMAP soil-moisture features are estimated from rainfall/humidity
+    because no real-time satellite API is available:
+        SMAP_7Day_Avg     ≈ 0.010 × rain_7day  + 0.002 × hum_7avg  − 0.05
+        SMAP_3Day_Max     ≈ 0.012 × rain_3day  + 0.002 × humidity  − 0.04
+        Rain_on_Wet_Soil  = daily_rain × SMAP_7Day_Avg
 
     Args:
         city:         City name (str)
@@ -167,12 +183,12 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
         current_date: Optional datetime (defaults to now)
 
     Returns:
-        numpy array of shape (1, 49)
+        numpy array of shape (1, 52)
     """
     if current_date is None:
         current_date = datetime.now()
 
-    # ── 1. Temporal (11 features) ──
+    # ── 1. Temporal (11) ──
     t = _temporal_features(current_date)
 
     # ── 2. Weather basics (3) ──
@@ -188,7 +204,7 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
     rain_30day = weather_data.get('rain_30day', 0.0)
     rain_60day = weather_data.get('rain_60day', 0.0)
 
-    # ── 4. Rolling stats (7) ──
+    # ── 4. Rolling stats (7 stats, features 21-29) ──
     rain_hist_7  = weather_data.get('daily_rain_history', [0] * 7)[-7:]
     rain_hist_30 = weather_data.get('daily_rain_history_30', rain_hist_7)[-30:]
     rs = _rolling_rain_stats(rain_hist_7, rain_hist_30)
@@ -199,25 +215,40 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
     temp_7avg = float(np.mean(temp_hist)) if temp_hist else temp
     hum_7avg  = float(np.mean(hum_hist))  if hum_hist  else humidity
 
-    # ── 6. Hydrology (2) ──
+    # ── 6. Hydrology proxies (2) ──
     soil_moisture_proxy   = rain_30day / (CITY_ELEVATION.get(city, 50) + 1)
     rainfall_acceleration = rain_3day / (rain_7day + 1)
 
-    # ── 7. Geographic (3) ──
+    # ── 7. SMAP soil-moisture ─────────────────────────────────────────
+    # If the exact NASA POWER API GWETROOT history was loaded, use it.
+    # Otherwise, fallback to the physics-based proxy approximation.
+    smap_history = weather_data.get('smap_history', [])
+    if smap_history and len(smap_history) >= 1:
+        # Use the real satellite data history
+        smap_7day_avg = float(np.mean(smap_history))
+        smap_3day_max = float(np.max(smap_history[-3:]))
+    else:
+        # Physics-based approximation
+        smap_7day_avg = max(0.0, 0.010 * rain_7day  + 0.002 * hum_7avg  - 0.05)
+        smap_3day_max = max(0.0, 0.012 * rain_3day  + 0.002 * humidity  - 0.04)
+        
+    rain_on_wet_soil = daily_rain * smap_7day_avg
+
+    # ── 8. Geographic (3) ──
     elevation = CITY_ELEVATION.get(city, 50)
     latitude  = weather_data.get('latitude', 26.0)
     longitude = weather_data.get('longitude', 85.0)
 
-    # ── 8. CN & TWI (6) ──
+    # ── 9. CN & TWI (6) ──
     cn  = CITY_CURVE_NUMBER.get(city, 78)
     twi = CITY_TWI.get(city, 11.0)
     cn_runoff   = _cn_runoff(cn, daily_rain)
     cn_cat      = _cn_category(cn)
     twi_risk    = _twi_risk(twi)
-    cn_twi_haz  = cn_cat * twi_risk                    # CN_TWI_Hazard
-    urban_flash = cn_runoff * twi / (elevation + 1)    # Urban_Flash_Risk
+    cn_twi_haz  = cn_cat * twi_risk
+    urban_flash = cn_runoff * twi / (elevation + 1)
 
-    # ── 9. Interaction features (8) ──
+    # ── 10. Interaction features (8) ──
     elev_rain_ratio   = elevation / (rain_7day + 1)
     elev_rain30_ratio = elevation / (rain_30day + 1)
     monsoon_rain      = t['Is_Monsoon_Season'] * daily_rain
@@ -227,9 +258,9 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
     soil_monsoon      = soil_moisture_proxy * t['Is_Monsoon_Season']
     low_elev_heavy    = 1 if (elevation < 50 and daily_rain > 50) else 0
 
-    # ── Assemble in exact column order ──
+    # ── Assemble in exact column order (52 total) ─────────────────────
     features = [
-        # Temporal  (1-11)
+        # Temporal (1-11)
         t['Month'],                     # 1
         t['Day_of_Year'],               # 2
         t['Week_of_Year'],              # 3
@@ -252,7 +283,7 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
         rain_14day,                     # 18
         rain_30day,                     # 19
         rain_60day,                     # 20
-        # Rolling stats (21-27)
+        # Rolling stats (21-29)
         rs['Rainfall_7Day_Avg'],        # 21
         rs['Rainfall_7Day_Max'],        # 22
         rs['Rainfall_7Day_Std'],        # 23
@@ -262,30 +293,34 @@ def build_feature_vector_v3(city, weather_data, current_date=None):
         rs['Heavy_Rain_Days_7D'],       # 27
         rs['Extreme_Rain_Days_7D'],     # 28
         rs['Consecutive_Dry_Days'],     # 29
-        # Hydrology (30-31)
+        # Hydrology proxies (30-31)
         soil_moisture_proxy,            # 30
         rainfall_acceleration,          # 31
-        # Geographic (32-34)
-        elevation,                      # 32
-        latitude,                       # 33
-        longitude,                      # 34
-        # CN & TWI (35-41)
-        cn,                             # 35
-        twi,                            # 36
-        cn_runoff,                      # 37
-        cn_cat,                         # 38
-        twi_risk,                       # 39
-        cn_twi_haz,                     # 40
-        urban_flash,                    # 41
-        # Interaction features (42-49)
-        elev_rain_ratio,                # 42
-        elev_rain30_ratio,              # 43
-        monsoon_rain,                   # 44
-        peak_monsoon_rain,              # 45
-        hum_temp_product,               # 46
-        rain_hum_product,               # 47
-        soil_monsoon,                   # 48
-        low_elev_heavy,                 # 49
+        # SMAP proxies (32-34) ← NEW
+        smap_7day_avg,                  # 32  SMAP_7Day_Avg
+        smap_3day_max,                  # 33  SMAP_3Day_Max
+        rain_on_wet_soil,               # 34  Rain_on_Wet_Soil
+        # Geographic (35-37)
+        elevation,                      # 35
+        latitude,                       # 36
+        longitude,                      # 37
+        # CN & TWI (38-44)
+        cn,                             # 38
+        twi,                            # 39
+        cn_runoff,                      # 40
+        cn_cat,                         # 41
+        twi_risk,                       # 42
+        cn_twi_haz,                     # 43
+        urban_flash,                    # 44
+        # Interaction features (45-52)
+        elev_rain_ratio,                # 45
+        elev_rain30_ratio,              # 46
+        monsoon_rain,                   # 47
+        peak_monsoon_rain,              # 48
+        hum_temp_product,               # 49
+        rain_hum_product,               # 50
+        soil_monsoon,                   # 51
+        low_elev_heavy,                 # 52
     ]
 
     return np.array([features])
