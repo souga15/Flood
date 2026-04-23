@@ -10,37 +10,26 @@ export default function WeatherDisplay({ weatherData }) {
         );
     }
 
+    const metrics = [
+        { icon: '🌡️', label: 'Temperature', value: `${weatherData.temperature}°C` },
+        { icon: '🌧️', label: 'Rainfall',    value: `${weatherData.rainfall} mm` },
+        { icon: '💨', label: 'Wind Speed',  value: `${weatherData.windspeed} km/h` },
+        { icon: '💧', label: 'Humidity',    value: weatherData.humidity != null ? `${weatherData.humidity}%` : '—' },
+    ];
+
     return (
         <div className="weather-display">
             <h3>Current Conditions</h3>
             <div className="weather-metrics">
-                <div className="metric-card">
-                    <div className="metric-info">
-                        <span className="metric-label">Temperature</span>
-                        <span className="metric-value">{weatherData.temperature}°C</span>
+                {metrics.map(({ icon, label, value }) => (
+                    <div key={label} className="metric-card">
+                        <span className="metric-icon" aria-hidden="true">{icon}</span>
+                        <div className="metric-info">
+                            <span className="metric-label">{label}</span>
+                            <span className="metric-value">{value}</span>
+                        </div>
                     </div>
-                </div>
-
-                <div className="metric-card">
-                    <div className="metric-info">
-                        <span className="metric-label">Rainfall</span>
-                        <span className="metric-value">{weatherData.rainfall} mm</span>
-                    </div>
-                </div>
-
-                <div className="metric-card">
-                    <div className="metric-info">
-                        <span className="metric-label">Wind Speed</span>
-                        <span className="metric-value">{weatherData.windspeed} km/h</span>
-                    </div>
-                </div>
-
-                <div className="metric-card">
-                    <div className="metric-info">
-                        <span className="metric-label">Humidity</span>
-                        <span className="metric-value">{weatherData.humidity ?? '—'}%</span>
-                    </div>
-                </div>
+                ))}
             </div>
         </div>
     );

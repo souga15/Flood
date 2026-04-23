@@ -70,6 +70,7 @@ export default function Dashboard() {
     const [serverStatus, setServerStatus] = useState({ status: 'checking', model_loaded: false });
     const [modelInfo, setModelInfo] = useState({ version: null, featureCount: null });
     const [modelMetrics, setModelMetrics] = useState(null);
+    const [lastUpdated, setLastUpdated] = useState(null);
 
     useEffect(() => {
         checkServerHealth();
@@ -132,6 +133,8 @@ export default function Dashboard() {
             if (result.model_metrics) {
                 setModelMetrics(result.model_metrics);
             }
+
+            setLastUpdated(new Date());
 
             if (result.latitude && result.longitude) {
                 setMapLocation({ latitude: result.latitude, longitude: result.longitude });
@@ -203,6 +206,12 @@ export default function Dashboard() {
                 <div className="dashboard-grid">
                     {/* Left Column: Weather + Risk + Explainability */}
                     <div className="data-panel">
+                        {loading && (
+                            <div className="loading-overlay" aria-live="polite" aria-busy="true">
+                                <div className="loading-spinner" />
+                                <span>Fetching data…</span>
+                            </div>
+                        )}
                         <WeatherDisplay weatherData={weatherData} />
                         <div className="spacer" />
                         <FloodRiskIndicator
@@ -228,9 +237,10 @@ export default function Dashboard() {
                     <div className="info-footer">
                         <p>
                             Data: Open-Meteo API &nbsp;|&nbsp; Model:{' '}
-                            {modelInfo.version?.toUpperCase() || 'N/A'} (XGBoost, 52 features)
+                            {modelInfo.version?.toUpperCase() || 'N/A'} (XGBoost
+                            {modelInfo.featureCount != null ? `, ${modelInfo.featureCount} features` : ''})
                         </p>
-                        <p>Last Update: {new Date().toLocaleTimeString()}</p>
+                        <p>Last Update: {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}</p>
                     </div>
                 )}
             </div>
